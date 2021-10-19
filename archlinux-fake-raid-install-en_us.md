@@ -7,6 +7,7 @@
 - [Introduction](##introduction)
 - [Pre-installation](##pre-installation)
 - [Installation](##installation)
+- [Post-installation](##post-installation)
 
 
 
@@ -188,7 +189,10 @@ sdb           8:16   0 238.5G  0 disk
 Use the [pacstrap](https://man.archlinux.org/man/pacstrap.8) script to install the base package, Linux kernel and firmware for common hardware:
 
 ```
-# pacstrap /mnt base linux linux-firmware linux-headers mdadm intel-ucode dosfstools xfsprogs sudo vim nano wget git zsh libnewt --noconfirm --needed
+# pacstrap /mnt base linux linux-firmware linux-headers mdadm intel-ucode dosfstools xfsprogs sudo vim nano wget git zsh libnewt networkmanager --noconfirm --needed
+# systemctl enable NetworkManager
+# systemctl enable NetworkManager-dispatcher.service
+# systemctl enable bluetooth
 ```
 
 #### Fstab
@@ -281,14 +285,53 @@ Creating the swap file:
 # sed -i '/%wheel ALL=(ALL) NOPASSWD: ALL'/s/^#//g /etc/sudoers
 ```
 
+
+#### Prior to booting RAID settings steps
+
+Generate /etc/mdadm.conf in preparation of generating the initial ramdisk. This will facilitate automatic RAID assembly during boot.
+
+```
+# mdadm --examine --scan > /etc/mdadm.conf
+```
+
+Open /etc/mkinitcpio.conf in your preferred text editor.
+
+```
+# nano /etc/mkinitcpio.conf
+```
+
+Add /sbin/mdmon to the BINARIES section. mdmon monitors external metadata and will be automatically executed by udev rules.
+
+```
+BINARIES="/sbin/mdmon"
+```
+
+Add mdadm_udev to the HOOKS section between block and filesystems. mdadm_udev is an installation hook that includes mdadm and the udev rules responsible for RAID assembly in the initramfs.
+
+```
+HOOKS="base udev autodetect modconf block mdadm_udev filesystems keyboard fsck"
+
+```
+
+Generate the initramfs.
+
+```
+# mkinitcpio -p linux
+```
+
 #### Installing the bootloader
 
 ```
 # pacman -S --noconfig --needed grub efibootmgr
 # mkdir /boot/grub
 # grub-mkconfig -o /boot/grub/grub.cfg
-# grub-install --target=x86_64-efi --efi-directory=/boot --recheck /dev/md126
+# grub-install --target=x86_64-efi --efi-directory=/boot --bootloader-id=GRUB --recheck /dev/md126
 ```
+
+
+
+## Post-installation
+
 
 
 ### Extra packages
@@ -296,7 +339,7 @@ Creating the swap file:
 #### System utilities
 
 ```
-# pacman -S --needed man-pages man-db bash-completion zsh-completions zsh-syntax-highlighting zsh-autosuggestions nano base-devel git pacman-contrib  usbutils lsof dmidecode dialog mc neofetch fwupd powertop gpm htop zip unzip unrar p7zip lzop lm_sensors imv bat fzf jq
+# pacman -S --needed man-pages man-db bash-completion zsh-completions zsh-syntax-highlighting zsh-autosuggestions nano base-devel git pacman-contrib usbutils lsof dmidecode dialog mc neofetch fwupd powertop gpm htop zip unzip unrar p7zip lzop lm_sensors imv bat fzf jq
 ```
 
 #### Some network tools
