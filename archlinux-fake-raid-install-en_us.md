@@ -334,6 +334,57 @@ Generate the initramfs.
 
 
 
+### Minimal GNOME Desktop install
+
+```
+# pacman -S --noconfirm --needed acpid ntp dbus cups cronie xorg-server xorg-xinit xf86-input-synaptics gnome-shell nautilus gnome-terminal guake gnome-tweak-tool gnome-control-center xdg-user-dirs gdm gnome-keyring nvidia nvidia-utils nvidia-settings
+
+# nvidia-xconfig
+
+# systemctl enable acpid.service
+# systemctl enable ntpd
+# systemctl enable gdm
+```
+
+#### Pacman hook
+
+To avoid the possibility of forgetting to update initramfs after an NVIDIA driver upgrade, you may want to use a pacman hook
+
+```
+#nano /etc/pacman.d/hooks/nvidia.hook
+```
+
+```
+[Trigger]
+Operation=Install
+Operation=Upgrade
+Operation=Remove
+Type=Package
+Target=nvidia
+Target=linux
+# Change the linux part above and in the Exec line if a different kernel is used
+
+[Action]
+Description=Update Nvidia module in initcpio
+Depends=mkinitcpio
+When=PostTransaction
+NeedsTargets
+Exec=/bin/sh -c 'while read -r trg; do case $trg in linux) exit 0; esac; done; /usr/bin/mkinitcpio -P'
+```
+
+#### Hardware accelerated video encoding with NVENC
+
+NVENC requires the nvidia_uvm module and the creation of related device nodes under /dev. Manually loading the nvidia_uvm module will not create the device nodes, but invoking the nvidia-modprobe utility will. Create /etc/udev/rules.d/70-nvidia.rules:
+
+```
+# nano /etc/udev/rules.d/70-nvidia.rules
+```
+
+```
+ACTION=="add", DEVPATH=="/bus/pci/drivers/nvidia", RUN+="/usr/bin/nvidia-modprobe -c0 -u"
+```
+
+
 ### Extra packages
 
 #### System utilities
